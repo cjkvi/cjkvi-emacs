@@ -1,8 +1,7 @@
 ;; 漢字データベース・異体字管理・検索ユーティリティ
 
 (require 'variants-table)
-(require 'ivs-aj1)
-(require 'ivs-hd)
+(require 'ivs-tables)
 
 (defvar variants-name
   '((compat/variant . "互換漢字")
