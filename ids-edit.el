@@ -299,8 +299,6 @@ If ARG is provided, decompose char even if char exists at point."
         (backward-delete-char 1)
         (insert decomposition))))))
 
-(global-set-key "\M-U" 'ids-edit-char)
-
 (provide 'ids-edit)
 
 ;;; ids-edit.el ends here
