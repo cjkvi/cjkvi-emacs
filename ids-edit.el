@@ -11,8 +11,6 @@
 
 (defvar ids-edit-kdp-sl3
   (concat (file-name-directory (locate-library "ids-edit")) "/kdp.sl3"))
-(defvar ids-edit-unihan-sl3
-  (concat (file-name-directory (locate-library "ids-edit")) "/unihan.sl3"))
 
 (defvar ids-edit-sl3-program "sqlite3")
 (defvar ids-edit-sl3-program-options nil)
@@ -42,9 +40,6 @@
 
 (defconst ids-edit-sql-strokes-format 
   "select strokes.k from strokes where strokes.v between %d and %d ")
-
-(defconst ids-edit-sql-japanese-format
-  "select unihan.kIRG_JSource.k from unihan.kIRG_JSource where unihan.kIRG_JSource.v is not null ")
 
 (defconst ids-edit-sql-char-strokes-format
   "select strokes.v from strokes where strokes.k = \"%X\" ")
@@ -104,7 +99,7 @@
                  (eq (process-status ids-edit-process) 'run))
       (condition-case nil
           (if ids-edit-process 
-              (ids-edit-kill-process ids-edit-process))
+              (ids-edit-kill-process))
         (error nil))
       (message "Creating new ids-edit process. args=%s"
                (append ids-edit-sl3-program-options
@@ -196,9 +191,9 @@
   "Calculate total strokes of IDS."
   (when (null (string-match "？" ids))
     (let* ((chars (string-to-list (replace-regexp-in-string "[^㐀-鿆𠀀-𫜴]" "" ids)))
-           (chars-uniq (remove-duplicates chars))
+           (chars-uniq (cl-remove-duplicates chars))
            ;; IDS中の各漢字の数を数える。
-           (char-count (mapcar (lambda (x) (cons x (count x chars))) chars-uniq))
+           (char-count (mapcar (lambda (x) (cons x (cl-count x chars))) chars-uniq))
            ;; (漢字 . 漢字数) を、(画数リスト . 漢字数) に変換。
            (strokes-count (mapcar (lambda (x) (cons (ids-edit-char-strokes (car x))
                                                     (cdr x)))
@@ -215,7 +210,7 @@
 ;;; char-to-code, code-to-char functions
 ;;;
 
-(defun kdp-util-char-to-code (char)
+(defun char-to-cdp-code (char)
   (if (and (< #xf100 char) (< char #xf700))
       (let* ((x (- char #xee1b))
              (y (% x 157))
@@ -223,10 +218,10 @@
         (format "CDP-%02X%02X" (+ (/ x 157) #x80) y))
     (format "%X" char)))
 
-(defun kdp-util-code-to-char (code)
+(defun cdp-code-to-char (code)
   (if (string-match "^CDP" code)
-      (let* ((x (string-to-number (substring str 4 6) 16))
-             (y (string-to-number (substring str 6 8) 16))
+      (let* ((x (string-to-number (substring code 4 6) 16))
+             (y (string-to-number (substring code 6 8) 16))
              (x (+ (* (- x #x80) 157) (if (< y 129) (- y 64) (- y 98)))))
         (+ x #xee1b))
     (string-to-number code 16)))
@@ -246,8 +241,7 @@ If it does not match, return nil."
            (flag (match-string 4 query))
            strokes
            ids-sql
-           strokes-sql
-           flag-sql)
+           strokes-sql)
       (setq strokes (if (or from to) (ids-edit-strokes ids))
             from    (if from (string-to-number from) 0)
             to      (if to (if (= (length to) 1) 99 ;; e.g. "20-" -> "20-99"
@@ -259,14 +253,13 @@ If it does not match, return nil."
               (mapconcat (lambda (x)
                            (format ids-edit-sql-strokes-format (+ x from) (+ x to)))
                          strokes " intersect ")))
-      (when flag 
-        (setq flag-sql ids-edit-sql-japanese-format))
       (format 
        (if count ids-edit-sql-count-format
            ids-edit-sql-utf8-format )
        (concat ids-sql
                (if strokes-sql (concat " intersect " strokes-sql))
-               (if flag (concat " intersect " flag-sql))))
+               ;;(if flag (concat " intersect " flag-sql))
+               ))
       )))
 
 ;;;
