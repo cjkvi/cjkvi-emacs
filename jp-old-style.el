@@ -4,10 +4,10 @@
 
 ;; Author: KAWABATA, Taichi <kawabata.taichi_at_gmail.com>
 ;; Description: Convert Japanese Kanji to Old Kanji IVS.
-;; Created: 2013-04-01
+;; Created: 2013-04-02
 ;; Keywords: Ideographic Variation Sequence
-;; Version: 0.0.1
-;; Package-version: 0.0.1
+;; Version: 0.0.2
+;; Package-version: 0.0.2
 ;; URL: http://github.com/cjkvi/
 
 ;;; Commentary:
@@ -19,19 +19,19 @@
 ;;   換する。
 ;;
 ;; 参考資料
-;; - 府川・小池「旧字・旧かな入門」（柏書房）
+;; - 府川・小池「旧字旧かな入門」（柏書房）
 ;; - 常用漢字表
 ;; - 印刷標準字体表
 ;; - JIS X 0208:1997 規格表 (入れ替え・追加22文字等）
 ;; - JIS X 0213:2004 規格表
 ;; - Adobe GSUB テーブル (trad 等)
 ;; - Adobe cid2code.txt
-;; - 斎藤修三郎 「青空文庫ジェネレータ」
-
+;; - 斎藤修三郎 「青空パッケージ」（LaTeX2e的）
 
 ;;; Code
 (eval-when-compile (require 'cl))
 
+(eval-when-compile
 (defvar jp-old-style-alist
   '(
     (?亜 "亞󠄀")
@@ -878,6 +878,7 @@
     (?弁 "辯󠄀")
     (?弁 "辨󠄀")
     (?弁 "辧󠄀")
+    (?弁 "辦󠄀")
     (?弁 "辮󠄀")
     (?鞭 "鞭󠄀")
     (?歩 "步󠄀")
@@ -1108,26 +1109,57 @@
     (?悞 "悞󠄁")
     (?煒 "煒󠄁")
     (?䦰 "鬮󠄀")
-    (?驊 "驊󠄀")))
+    (?驊 "驊󠄀")
+    (?𢭐 "撈󠄀")
+    )))
+
+(defvar jp-old-style-table
+  (eval-when-compile
+    (let ((table (make-char-table 'char-code-property-table)))
+      (mapc
+       (lambda (x) 
+         (aset table (car x) 
+               (cons (cadr x) (aref table (car x)))))
+       jp-old-style-alist)
+      (set-char-table-extra-slot table 0 'jp-old-style)
+      table)))
+
+(defvar jp-old-style-to-new-table
+  (eval-when-compile
+  (let ((table (make-char-table 'char-code-property-table)))
+    (map-char-table (lambda (c v) (aset table (string-to-char (car v)) c))
+                    jp-old-style-table)
+    (set-char-table-extra-slot table 0 'jp-new-style)
+    table)))
 
 ;;;###autoload
 (defun jp-old-style-region (from to)
   (interactive "r*")
   (save-excursion
     (save-restriction
-      (cl-flet ((assoc-all (key alist &optional test)
-                   (loop for cons in alist
-                         if (funcall (or test 'equal) (car cons) key)
-                         collect (cadr cons))))
-        (narrow-to-region from to)
-        (goto-char (point-min))
-        (while (re-search-forward "\\cC" nil t)
-          (let* ((ivs-list (assoc-all (string-to-char (match-string 0))
-                                      jp-old-style-alist))
-                 (ivs (if (< 1 (length ivs-list))
-                          (apply 'concat (append '("[") ivs-list '("]")))
-                        (car ivs-list))))
-            (if ivs-list (replace-match ivs))))))))
+      (narrow-to-region from to)
+      (goto-char (point-min))
+      (while (re-search-forward "\\cC" nil t)
+        (let* ((ivs-list (aref jp-old-style-table
+                               (string-to-char (match-string 0))))
+               (ivs
+                (if (< 1 (length ivs-list))
+                    (apply 'concat (append '("[") (reverse ivs-list) '("]")))
+                  (car ivs-list))))
+          (if ivs-list (replace-match ivs)))))))
+
+;;;###autoload
+(defun jp-old-style-to-new-region (from to)
+  (interactive "r*")
+  (save-excursion
+    (save-restriction
+      (narrow-to-region from to)
+      (goto-char (point-min))
+      (while (re-search-forward "\\cC[󠄀-󠇯]?" nil t)
+        (let ((new-char (aref jp-old-style-to-new-table
+                              (string-to-char (match-string 0)))))
+          (if new-char (replace-match (char-to-string new-char)))))
+      (ucs-normalize-NFC-region (point-min) (point-max)))))
 
 ;;;###autoload
 (defun jp-old-style-string (string)
